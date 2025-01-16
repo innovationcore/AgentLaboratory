@@ -677,19 +677,19 @@ if __name__ == "__main__":
          "note": f"You should come up with a plan for TWO experiments."},
 
         {"phases": ["plan formulation", "data preparation", "running experiments"],
-         "note": "Please use gpt-4o-mini for your experiments."},
+         "note": "Please use Llama 3.1 8B for your experiments."},
 
         {"phases": ["running experiments"],
-         "note": f'Use the following code to inference gpt-4o-mini: \nfrom openai import OpenAI\nos.environ["OPENAI_API_KEY"] = "{api_key}"\nopenai.base_url = {base_url}\nclient = OpenAI()\ncompletion = client.chat.completions.create(\nmodel="gpt-4o-mini-2024-07-18", messages=messages)\nanswer = completion.choices[0].message.content\n'},
+         "note": f'Use the following code to infer using Llama 3.1 8B via the OpenAI API Python package: \nfrom openai import OpenAI\nos.environ["OPENAI_API_KEY"] = "{api_key}"\nopenai.base_url = {base_url}\nclient = OpenAI()\ncompletion = client.chat.completions.create(\nmodel="", messages=messages)\nanswer = completion.choices[0].message.content\n'},
 
         {"phases": ["running experiments"],
-         "note": f"You have access to only gpt-4o-mini using the OpenAI API, please use the following key {api_key} but do not use too many inferences. Do not use openai.ChatCompletion.create or any openai==0.28 commands. Instead use the provided inference code."},
+         "note": f"You have access to only Llama 3.1 8B using the OpenAI API, please use the following key {api_key} but do not use too many inferences. Do not use openai.ChatCompletion.create or any openai==0.28 commands. Instead use the provided inference code."},
 
         {"phases": ["running experiments"],
          "note": "I would recommend using a small dataset (approximately only 100 data points) to run experiments in order to save time. Do not use much more than this unless you have to or are running the final tests."},
 
         {"phases": ["data preparation", "running experiments"],
-         "note": "You are running on a MacBook laptop. You can use 'mps' with PyTorch"},
+         "note": "You are running on a Windows desktop with a top tier Nvidia GPU. You can use any Python package that works with Windows."},
 
         {"phases": ["data preparation", "running experiments"],
          "note": "Generate figures with very colorful and artistic design."},

@@ -171,19 +171,22 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                     {"role": "user", "content": prompt}]
 
                 # need this bc context window is small for Llama 3.1
-                messages = utils.clip_tokens(messages, model="", max_tokens=8000)
-                print(messages)
+                messages = utils.clip_tokens(messages, model="", max_tokens=7750)
 
                 if version == "0.28":
                     if temp is None:
                         completion = openai.ChatCompletion.create(
                             model=f"{model_str}",  # engine = "deployment_name".
-                            messages=messages
+                            messages=messages,
+                            max_tokens=4000
                         )
                     else:
                         completion = openai.ChatCompletion.create(
                             model=f"{model_str}",  # engine = "deployment_name".
-                            messages=messages, temperature=temp)
+                            messages=messages,
+                            temperature=temp,
+                            max_tokens=4000
+                        )
                 else:
                     client = OpenAI()
                     if temp is None:
@@ -192,7 +195,7 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                     else:
                         completion = client.chat.completions.create(
                             model="", messages=messages, temperature=temp)
-                print(f'\n\n {completion} \n\n')
+                # print(f'\n\n {completion} \n\n')
                 answer = completion.choices[0].message.content
 
             if model_str == "":
