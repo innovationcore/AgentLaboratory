@@ -286,6 +286,13 @@ class ArxivSearch:
         time.sleep(2.0)
         return pdf_text
 
+    def paper_exists(self, query):
+        try:
+            next(arxiv.Client().results(arxiv.Search(id_list=[query])))
+            return True
+        except Exception as e:
+            return False
+
 """
 import multiprocessing
 import sys

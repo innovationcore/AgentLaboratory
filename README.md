@@ -69,6 +69,7 @@ sudo apt install pdflatex
 ```
 - This enables latex source to be compiled by the agents.
 - **[IMPORTANT]** If this step cannot be run due to not having sudo access, pdf compiling can be turned off via running Agent Laboratory via setting the `--compile-latex` flag to false: `--compile-latex "false"`
+- You can use: `--base_url "http://localhost/v1"` to specific the OpenAI API endpoint.
 
 
 

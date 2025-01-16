@@ -3,6 +3,8 @@ from openai import OpenAI
 import openai
 import os, anthropic, json
 
+import utils
+
 TOKENS_IN = dict()
 TOKENS_OUT = dict()
 
@@ -17,6 +19,7 @@ def curr_cost_est():
         "claude-3-5-sonnet": 3.00 / 1000000,
         "deepseek-chat": 1.00 / 1000000,
         "o1": 15.00 / 1000000,
+        "": 0, # No cost for LLM Factory!
     }
     costmap_out = {
         "gpt-4o": 10.00/ 1000000,
@@ -26,10 +29,11 @@ def curr_cost_est():
         "claude-3-5-sonnet": 12.00 / 1000000,
         "deepseek-chat": 5.00 / 1000000,
         "o1": 60.00 / 1000000,
+        "": 0, # No cost for LLM Factory!
     }
     return sum([costmap_in[_]*TOKENS_IN[_] for _ in TOKENS_IN]) + sum([costmap_out[_]*TOKENS_OUT[_] for _ in TOKENS_OUT])
 
-def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic_api_key=None, tries=5, timeout=5.0, temp=None, print_cost=True, version="1.5"):
+def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic_api_key=None, tries=10, timeout=10.0, temp=None, print_cost=True, version="1.5"):
     preloaded_api = os.getenv('OPENAI_API_KEY')
     if openai_api_key is None and preloaded_api is not None:
         openai_api_key = preloaded_api
@@ -40,6 +44,8 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
         os.environ["OPENAI_API_KEY"] = openai_api_key
     if anthropic_api_key is not None:
         os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
+    base_url = os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1')
+    openai.base_url = base_url
     for _ in range(tries):
         try:
             if model_str == "gpt-4o-mini" or model_str == "gpt4omini" or model_str == "gpt-4omini" or model_str == "gpt4o-mini":
@@ -159,13 +165,46 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                     completion = client.chat.completions.create(
                         model="o1-preview", messages=messages)
                 answer = completion.choices[0].message.content
+            elif model_str == "": # LLM Factory Model
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}]
 
-            if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "o1"]:
+                # need this bc context window is small for Llama 3.1
+                messages = utils.clip_tokens(messages, model="", max_tokens=8000)
+                print(messages)
+
+                if version == "0.28":
+                    if temp is None:
+                        completion = openai.ChatCompletion.create(
+                            model=f"{model_str}",  # engine = "deployment_name".
+                            messages=messages
+                        )
+                    else:
+                        completion = openai.ChatCompletion.create(
+                            model=f"{model_str}",  # engine = "deployment_name".
+                            messages=messages, temperature=temp)
+                else:
+                    client = OpenAI()
+                    if temp is None:
+                        completion = client.chat.completions.create(
+                            model="", messages=messages, )
+                    else:
+                        completion = client.chat.completions.create(
+                            model="", messages=messages, temperature=temp)
+                print(f'\n\n {completion} \n\n')
+                answer = completion.choices[0].message.content
+
+            if model_str == "":
+                # Explicitly specify the LLaMA 3.1 encoding, TODO use the actual Llama 3.1 encoder
+                encoding = tiktoken.get_encoding("cl100k_base")
+            elif model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "o1"]:
                 encoding = tiktoken.encoding_for_model("gpt-4o")
             elif model_str in ["deepseek-chat"]:
                 encoding = tiktoken.encoding_for_model("cl100k_base")
             else:
                 encoding = tiktoken.encoding_for_model(model_str)
+
             if model_str not in TOKENS_IN:
                 TOKENS_IN[model_str] = 0
                 TOKENS_OUT[model_str] = 0
@@ -176,6 +215,7 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
             return answer
         except Exception as e:
             print("Inference Exception:", e)
+            print("Probably rate limited.")
             time.sleep(timeout)
             continue
     raise Exception("Max retries: timeout")

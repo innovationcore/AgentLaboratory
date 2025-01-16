@@ -75,7 +75,10 @@ def save_to_file(location, filename, data):
 
 
 def clip_tokens(messages, model="gpt-4", max_tokens=100000):
-    enc = tiktoken.encoding_for_model(model)
+    if model == "":
+        enc = tiktoken.get_encoding("cl100k_base")
+    else:
+        enc = tiktoken.encoding_for_model(model)
     total_tokens = sum([len(enc.encode(message["content"])) for message in messages])
 
     if total_tokens <= max_tokens:
