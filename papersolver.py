@@ -582,6 +582,3 @@ class PaperSolver:
             "You are a PhD student who has submitted a paper to an ML conference called ICLR. Your goal was to write a research paper and get high scores from the reviewers so that it get accepted to the conference.\n"
         )
         return phase_str
-
-
-
