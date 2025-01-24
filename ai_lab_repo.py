@@ -11,7 +11,7 @@ DEFAULT_LLM_BACKBONE = "o1-mini"
 
 
 class LaboratoryWorkflow:
-    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, agent_model_backbone=f"{DEFAULT_LLM_BACKBONE}", notes=list(), human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5, openai_base_url="https://api.openai.com/v1"):
+    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, agent_model_backbone=f"{DEFAULT_LLM_BACKBONE}", notes=list(), human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5, openai_base_url="https://api.openai.com/v1", pubmed_email=None):
         """
         Initialize laboratory workflow
         @param research_topic: (str) description of research idea to explore
@@ -29,11 +29,13 @@ class LaboratoryWorkflow:
         self.model_backbone = agent_model_backbone
         self.num_papers_lit_review = num_papers_lit_review
         self.openai_base_url = openai_base_url
+        self.pubmed_email = pubmed_email
 
         self.print_cost = True
         self.review_override = True # should review be overridden?
         self.review_ovrd_steps = 0 # review steps so far
         self.arxiv_paper_exp_time = 3
+        self.pubmed_paper_exp_time = 3
         self.reference_papers = list()
 
         ##########################################
@@ -42,6 +44,7 @@ class LaboratoryWorkflow:
         self.num_ref_papers = 1
         self.review_total_steps = 0 # num steps to take if overridden
         self.arxiv_num_summaries = 5
+        self.pubmed_num_summaries = 5
         self.mlesolver_max_steps = mlesolver_max_steps
         self.papersolver_max_steps = papersolver_max_steps
 
@@ -447,6 +450,7 @@ class LaboratoryWorkflow:
         @return: (bool) whether to repeat the phase
         """
         arx_eng = ArxivSearch()
+        pubmed_eng = PubMedSearch(email=self.pubmed_email)
         max_tries = self.max_steps * 5 # lit review often requires extra steps
         # get initial response from PhD agent
         resp = self.phd.inference(self.research_topic, "literature review", step=0, temp=0.8)
@@ -459,11 +463,15 @@ class LaboratoryWorkflow:
             if "```SUMMARY" in resp:
                 query = extract_prompt(resp, "SUMMARY")
                 papers = arx_eng.find_papers_by_str(query, N=self.arxiv_num_summaries)
-                feedback = f"You requested arXiv papers related to the query {query}, here was the response\n{papers}"
+                if papers is None:
+                    papers = pubmed_eng.find_papers_by_str(query, N=self.arxiv_num_summaries)
+                else :
+                    papers += '\n' + pubmed_eng.find_papers_by_str(query, N=self.arxiv_num_summaries)
+                feedback = f"You requested arXiv and PubMed papers related to the query {query}, here was the response\n{papers}"
 
             # grab full text from arxiv ID
-            elif "```FULL_TEXT" in resp:
-                query = extract_prompt(resp, "FULL_TEXT")
+            elif "```FULL_TEXT_ARX" in resp:
+                query = extract_prompt(resp, "FULL_TEXT_ARX")
                 # expiration timer so that paper does not remain in context too long
                 #check if arxiv paper exists
                 doesExist = arx_eng.paper_exists(query)
@@ -474,10 +482,31 @@ class LaboratoryWorkflow:
                 else:
                     feedback = "Paper does not exist."
 
+            # grab full text from PubMed ID
+            elif "```FULL_TEXT_PM" in resp:
+                query = extract_prompt(resp, "FULL_TEXT_PM")
+                # expiration timer so that paper does not remain in context too long
+                # check if PubMed paper exists
+                doesExist = pubmed_eng.paper_exists(query)
+
+                if doesExist:
+                    pubmed_paper = f"```EXPIRATION {self.pubmed_paper_exp_time}\n" + pubmed_eng.retrieve_full_paper_text(
+                        query) + "```"
+                    feedback = pubmed_paper
+                else:
+                    feedback = "Paper does not exist."
+
             # if add paper, extract and add to lit review, provide feedback
-            elif "```ADD_PAPER" in resp:
-                query = extract_prompt(resp, "ADD_PAPER")
+            elif "```ADD_PAPER_ARX" in resp:
+                query = extract_prompt(resp, "ADD_PAPER_ARX")
                 feedback, text = self.phd.add_review(query, arx_eng)
+                if len(self.reference_papers) < self.num_ref_papers:
+                    self.reference_papers.append(text)
+
+            # if add paper, extract and add to lit review, provide feedback
+            elif "```ADD_PAPER_PM" in resp:
+                query = extract_prompt(resp, "ADD_PAPER_PM")
+                feedback, text = self.phd.add_review(query, pubmed_eng)
                 if len(self.reference_papers) < self.num_ref_papers:
                     self.reference_papers.append(text)
 
@@ -549,6 +578,12 @@ def parse_arguments():
         '--deepseek-api-key',
         type=str,
         help='Provide the DeepSeek API key.'
+    )
+
+    parser.add_argument(
+        '--pubmed-email',
+        type=str,
+        help='Provide an email to use for querying the PubMed database.'
     )
 
     parser.add_argument(
@@ -650,7 +685,7 @@ if __name__ == "__main__":
         raise Exception("args.papersolver_max_steps must be a valid integer!")
 
 
-    api_key = os.getenv('OPENAI_API_KEY') or args.api_key
+    api_key =  args.api_key or os.getenv('OPENAI_API_KEY')
     deepseek_api_key = os.getenv('DEEPSEEK_API_KEY') or args.deepseek_api_key
     if args.api_key is not None and os.getenv('OPENAI_API_KEY') is None:
         os.environ["OPENAI_API_KEY"] = args.api_key
@@ -660,7 +695,7 @@ if __name__ == "__main__":
     if not api_key and not deepseek_api_key:
         raise ValueError("API key must be provided via --api-key / -deepseek-api-key or the OPENAI_API_KEY / DEEPSEEK_API_KEY environment variable.")
 
-    base_url = os.getenv('OPENAI_BASE_URL') or args.base_url
+    base_url = args.base_url or os.getenv('OPENAI_BASE_URL')
     if args.base_url is not None and os.getenv('OPENAI_BASE_URL') is None:
         os.environ["OPENAI_BASE_URL"] = args.base_url
 
@@ -674,25 +709,31 @@ if __name__ == "__main__":
 
     task_notes_LLM = [
         {"phases": ["plan formulation"],
-         "note": f"You should come up with a plan for TWO experiments."},
+         "note": f"You should come up with a plan to write a literature review."}, #You should come up with a plan for TWO experiments.
 
         {"phases": ["plan formulation", "data preparation", "running experiments"],
-         "note": "Please use Llama 3.1 8B for your experiments."},
+         "note": "Please use Llama 3.1 8B for your reference."}, #"note": "Please use Llama 3.1 8B for your experiments
+
+        # {"phases": ["running experiments"],
+        #  "note": f'Use the following code to infer using Llama 3.1 8B via the OpenAI API Python package: \nfrom openai import OpenAI\nos.environ["OPENAI_API_KEY"] = "{api_key}"\nopenai.base_url = {base_url}\nclient = OpenAI()\ncompletion = client.chat.completions.create(\nmodel="", messages=messages)\nanswer = completion.choices[0].message.content\n'},
 
         {"phases": ["running experiments"],
-         "note": f'Use the following code to infer using Llama 3.1 8B via the OpenAI API Python package: \nfrom openai import OpenAI\nos.environ["OPENAI_API_KEY"] = "{api_key}"\nopenai.base_url = {base_url}\nclient = OpenAI()\ncompletion = client.chat.completions.create(\nmodel="", messages=messages)\nanswer = completion.choices[0].message.content\n'},
+         "note": f'Do not run any external code. Draw conclusions using the papers that you have found.'},
+
+        # {"phases": ["running experiments"],
+        #  "note": f"You have access to only Llama 3.1 8B using the OpenAI API, please use the following key {api_key} but do not use too many inferences. Do not use openai.ChatCompletion.create or any openai==0.28 commands. Instead use the provided inference code."},
+
+        # {"phases": ["running experiments"],
+        #  "note": "I would recommend using a small dataset (approximately only 100 data points) to run experiments in order to save time. Do not use much more than this unless you have to or are running the final tests."},
 
         {"phases": ["running experiments"],
-         "note": f"You have access to only Llama 3.1 8B using the OpenAI API, please use the following key {api_key} but do not use too many inferences. Do not use openai.ChatCompletion.create or any openai==0.28 commands. Instead use the provided inference code."},
+         "note": "I would recommend using a dataset to bolster your conclusions."},
 
-        {"phases": ["running experiments"],
-         "note": "I would recommend using a small dataset (approximately only 100 data points) to run experiments in order to save time. Do not use much more than this unless you have to or are running the final tests."},
+        # {"phases": ["data preparation", "running experiments"],
+        #  "note": "You are running on a Windows desktop with a good Nvidia GPU. You can use any Python package that works with Windows."},
 
         {"phases": ["data preparation", "running experiments"],
-         "note": "You are running on a Windows desktop with a top tier Nvidia GPU. You can use any Python package that works with Windows."},
-
-        {"phases": ["data preparation", "running experiments"],
-         "note": "Generate figures with very colorful and artistic design."},
+         "note": "Generate figures with very colorful and artistic design. If you cannot generate figures, please find and reference figures from the internet or relevant papers with citations."},
     ]
 
     task_notes_LLM.append(
@@ -743,7 +784,8 @@ if __name__ == "__main__":
             num_papers_lit_review=num_papers_lit_review,
             papersolver_max_steps=papersolver_max_steps,
             mlesolver_max_steps=mlesolver_max_steps,
-            openai_base_url=base_url
+            openai_base_url=base_url,
+            pubmed_email=args.pubmed_email,
         )
 
     lab.perform_research()

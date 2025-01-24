@@ -65,9 +65,47 @@ class Arxiv(Command):
         return (
             "============= ARXIV SEARCH TOOL ============="
             "You also have access to machine learning paper from Arxiv. "
-            "To search for summaries of papers on arxiv you can use the following command: ```SUMMARY\n<search query>\n```\n where <search query> is a string that will be used as the search query to find papers with semantically similar content and SUMMARY is just the word SUMMARY.\n"
-            "To get the full paper text for an arXiv paper, use the following command: ```FULL_TEXT\n<arxiv paper id>\n```\n where <arxiv paper id> is the ID of the arXiv paper (which can be found by using the SUMMARY command), and FULL_TEXT is just the word FULL_TEXT. Make sure to read the full text using the FULL_TEXT command before adding it to your list of relevant papers.\n"
+            "To search for summaries of papers on arxiv you can use the following command: ```SUMMARY_ARX\n<search query>\n```\n where <search query> is a string that will be used as the search query to find papers with semantically similar content and SUMMARY_ARX is just the word SUMMARY_ARX.\n"
+            "To get the full paper text for an arXiv paper, use the following command: ```FULL_TEXT_ARX\n<arxiv paper id>\n```\n where <arxiv paper id> is the ID of the arXiv paper (which can be found by using the SUMMARY_ARX command), and FULL_TEXT is just the word FULL_TEXT_ARX. Make sure to read the full text using the FULL_TEXT_ARX command before adding it to your list of relevant papers.\n"
             "When you read arxiv paper, make sure to take note of the techniques they are using to solve their problem as well as the hyperparameters and implementation details. These are very important for successfully solving machine learning problems."
+        )
+
+    def execute_command(self, *args) -> str:
+        # args[0] -> command
+        # args[1] -> query
+        if args[0] == "SUMMARY_ARX":
+            return self.arxiv_eng.find_papers_by_str(args[1], self.num_papers_per_search)
+        elif args[0] == "FULL_TEXT_ARX":
+            return self.arxiv_eng.retrieve_full_paper_text(args[1])
+        raise Exception("Invalid Arxiv Search")
+
+    def matches_command(self, cmd_str) -> bool:
+        if "```SUMMARY_ARX" in cmd_str: return True
+        elif "```FULL_TEXT_ARX" in cmd_str: return True
+        return False
+
+    def parse_command(self, *args) -> tuple:
+        sum_text = extract_prompt(args[0], "SUMMARY_ARX").split("\n")
+        full_text = extract_prompt(args[0], "FULL_TEXT_ARX").split("\n")
+        if len(sum_text) == 0 and len(full_text) == 0: return False, None
+        if len(sum_text) > 0: return True, ("SUMMARY_ARX", sum_text,)
+        if len(full_text) > 0: return True, ("FULL_TEXT_ARX", sum_text,)
+
+
+class PubMed(Command):
+    def __init__(self, email):
+        super().__init__()
+        self.pubmed_eng = PubMedSearch('sam.armstrong@uky.edu') ## TODO ACTUALLY GET THIS TO WORK
+        self.num_papers_per_search = 10
+        self.cmd_type = "SEARCH-pubmed"
+
+    def docstring(self) -> str:
+        return (
+            "============= PUBMED SEARCH TOOL ============="
+            "You also have access to machine learning paper from PubMed. "
+            "To search for summaries of papers on PubMed you can use the following command: ```SUMMARY_PM\n<search query>\n```\n where <search query> is a string that will be used as the search query to find papers with semantically similar content and SUMMARY_PM is just the word SUMMARY_PM.\n"
+            "To get the full paper text for an PubMed paper, use the following command: ```FULL_TEXT_PM\n<pubmed paper id>\n```\n where <pubmed paper id> is the ID of the PubMed paper (which can be found by using the SUMMARY_PM command), and FULL_TEXT_PM is just the word FULL_TEXT_PM. Make sure to read the full text using the FULL_TEXT_PM command before adding it to your list of relevant papers.\n"
+            "When you read PubMed paper, make sure to take note of the techniques they are using to solve their problem as well as the hyperparameters and implementation details. These are very important for successfully solving machine learning problems."
         )
 
     def execute_command(self, *args) -> str:
@@ -75,7 +113,7 @@ class Arxiv(Command):
         # args[1] -> query
         if args[0] == "SUMMARY":
             return self.arxiv_eng.find_papers_by_str(args[1], self.num_papers_per_search)
-        elif args[0] == "FULL_TEXT":
+        elif args[0] == "FULL_TEXT_ARX":
             return self.arxiv_eng.retrieve_full_paper_text(args[1])
         raise Exception("Invalid Arxiv Search")
 

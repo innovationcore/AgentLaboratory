@@ -631,13 +631,16 @@ class PhDStudentAgent(BaseAgent):
             raise Exception(f"Invalid phase: {phase}")
         if phase == "literature review":
             return (
-                "To collect paper summaries, use the following command: ```SUMMARY\nSEARCH QUERY\n```\n where SEARCH QUERY is a string that will be used to find papers with semantically similar content and SUMMARY is just the word SUMMARY. Make sure your search queries are very short.\n"
-                "To get the full paper text for an arXiv paper, use the following command: ```FULL_TEXT\narXiv paper ID\n```\n where arXiv paper ID is the ID of the arXiv paper (which can be found by using the SUMMARY command), and FULL_TEXT is just the word FULL_TEXT. Make sure to read the full text using the FULL_TEXT command before adding it to your list of relevant papers.\n"
-                "If you believe a paper is relevant to the research project proposal, you can add it to the official review after reading using the following command: ```ADD_PAPER\narXiv_paper_ID\nPAPER_SUMMARY\n```\nwhere arXiv_paper_ID is the ID of the arXiv paper, PAPER_SUMMARY is a brief summary of the paper, and ADD_PAPER is just the word ADD_PAPER. You can only add one paper at a time. \n"
-                "Make sure to use ADD_PAPER when you see a relevant paper. DO NOT use SUMMARY too many times."
+                "To collect paper summaries from arXiv, use the following command: ```SUMMARY_ARX\nSEARCH QUERY\n```\n where SEARCH QUERY is a string that will be used to find papers with semantically similar content and SUMMARY_ARX is just the word SUMMARY_ARX. Make sure your search queries are very short.\n"
+                "To collect paper summaries from PubMed, use the following command: ```SUMMARY_PM\nSEARCH QUERY\n```\n where SEARCH QUERY is a string that will be used to find papers with semantically similar content and SUMMARY_PM is just the word SUMMARY_PM. Make sure your search queries are very short.\n"
+                "To get the full paper text for an arXiv paper, use the following command: ```FULL_TEXT_ARX\narXiv paper ID\n```\n where arXiv paper ID is the ID of the arXiv paper (which can be found by using the SUMMARY_ARX command), and FULL_TEXT_ARX is just the word FULL_TEXT_ARX. Make sure to read the full text using the FULL_TEXT_ARX command before adding it to your list of relevant papers.\n"
+                "To get the full paper text for an PubMed paper, use the following command: ```FULL_TEXT_PM\nPubMed paper ID\n```\n where PubMed paper ID is the ID of the PubMed paper (which can be found by using the SUMMARY_PM command), and FULL_TEXT_PM is just the word FULL_TEXT_PM. Make sure to read the full text using the FULL_TEXT_ARX command before adding it to your list of relevant papers.\n"
+                "If you believe a arXiv paper is relevant to the research project proposal, you can add it to the official review after reading using the following command: ```ADD_PAPER_ARX\narXiv_paper_ID\nPAPER_SUMMARY\n```\nwhere arXiv_paper_ID is the ID of the arXiv paper, PAPER_SUMMARY is a brief summary of the paper, and ADD_PAPER_ARX is just the word ADD_PAPER_ARX. You can only add one paper at a time. \n"
+                "If you believe a PubMed paper is relevant to the research project proposal, you can add it to the official review after reading using the following command: ```ADD_PAPER_PM\nPubMed_paper_ID\nPAPER_SUMMARY\n```\nwhere PubMed_paper_ID is the ID of the PubMed paper, PAPER_SUMMARY is a brief summary of the paper, and ADD_PAPER_PM is just the word ADD_PAPER_PM. You can only add one paper at a time. \n"
+                "Make sure to use ADD_PAPER_ARX or ADD_PAPER_PM when you see a relevant paper. DO NOT use SUMMARY_ARX  too many times."
                 "You can only use a single command per inference turn. Do not use more than one command per inference. If you use multiple commands, then only one of them will be executed, not both.\n"
                 "Make sure to extensively discuss the experimental results in your summary.\n"
-                "When performing a command, make sure to include the three ticks (```) at the top and bottom ```COMMAND\ntext\n``` where COMMAND is the specific command you want to run (e.g. ADD_PAPER, FULL_TEXT, SUMMARY). Do not use the word COMMAND make sure to use the actual command, e.g. your command should look exactly like this: ```ADD_PAPER\ntext\n``` (where the command could be from ADD_PAPER, FULL_TEXT, SUMMARY)\n")
+                "When performing a command, make sure to include the three ticks (```) at the top and bottom ```COMMAND\ntext\n``` where COMMAND is the specific command you want to run (e.g. ADD_PAPER_ARX, ADD_PAPER_PM, FULL_TEXT_ARX, FULL_TEXT_PM, SUMMARY_ARX, SUMMARY_PM). Do not use the word COMMAND make sure to use the actual command, e.g. your command should look exactly like this: ```ADD_PAPER_ARX\ntext\n``` (where the command could be from ADD_PAPER_ARX, ADD_PAPER_PM, FULL_TEXT_ARX, FULL_TEXT_PM, SUMMARY)\n")
         elif phase == "plan formulation":
             return (
                 "You can produce dialogue using the following command: ```DIALOGUE\ndialogue here\n```\n where 'dialogue here' is the actual dialogue you will send and DIALOGUE is just the word DIALOGUE.\n"
@@ -671,9 +674,9 @@ class PhDStudentAgent(BaseAgent):
         if phase == "literature review":
             phase_str = (
                 "Your goal is to perform a literature review for the presented task and add papers to the literature review.\n"
-                "You have access to arXiv and can perform two search operations: (1) finding many different paper summaries from a search query and (2) getting a single full paper text for an arXiv paper.\n"
+                "You have access to arXiv and PubMed and can perform two search operations: (1) finding many different paper summaries from a search query and (2) getting a single full paper text for an arXiv or PubMed paper.\n"
             )
-            rev_papers = "Papers in your review so far: " + " ".join([_paper["arxiv_id"] for _paper in self.lit_review])
+            rev_papers = "Papers in your review so far: " + " ".join([_paper["id"] for _paper in self.lit_review])
             phase_str += rev_papers if len(self.lit_review) > 0 else ""
         elif phase == "plan formulation":
             phase_str = (
@@ -705,24 +708,21 @@ class PhDStudentAgent(BaseAgent):
     def role_description(self):
         return "a computer science PhD student at a top university."
 
-    def add_review(self, review, arx_eng):
+    def add_review(self, review, paper_eng):
         try:
-            arxiv_id, review_text = review.strip().split("\n", 1)
-            full_text = arx_eng.retrieve_full_paper_text(arxiv_id)
+            id, review_text = review.strip().split("\n", 1)
+            full_text = paper_eng.retrieve_full_paper_text(id)
             review_entry = {
-                "arxiv_id": arxiv_id,
+                "id": id,
                 "full_text": full_text,
                 "summary": review_text,
             }
             self.lit_review.append(review_entry)
-            return f"Successfully added paper {arxiv_id}", full_text
+            return f"Successfully added paper {id}", full_text
         except Exception as e:
             return f"Error trying to add review -- bad formatting, try again: {str(e)}", ""
 
     def format_review(self):
         return "Provided here is a literature review on this topic:\n" + "\n".join(
-            f"arXiv ID: {_l['arxiv_id']}, Summary: {_l['summary']}"
+            f"Paper ID: {_l['id']}, Summary: {_l['summary']}"
             for _l in self.lit_review)
-
-
-

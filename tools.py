@@ -293,6 +293,111 @@ class ArxivSearch:
         except Exception as e:
             return False
 
+
+
+from Bio import Entrez
+import time
+
+class PubMedSearch:
+    def __init__(self, email):
+        """
+        Initialize PubMedSearch with the user's email for Entrez API access.
+        :param email: Email address required by NCBI for API use.
+        """
+        Entrez.email = email
+
+    def _process_query(self, query: str) -> str:
+        """
+        Process query string to fit within PubMed limits (if necessary).
+        :param query: The original query string.
+        :return: Processed query string.
+        """
+        MAX_QUERY_LENGTH = 300
+
+        if len(query) <= MAX_QUERY_LENGTH:
+            return query
+
+        # Split into words and truncate to fit within the limit
+        words = query.split()
+        processed_query = []
+        current_length = 0
+
+        for word in words:
+            if current_length + len(word) + 1 <= MAX_QUERY_LENGTH:
+                processed_query.append(word)
+                current_length += len(word) + 1  # Account for spaces
+            else:
+                break
+
+        return ' '.join(processed_query)
+
+    def find_papers_by_str(self, query, N=20):
+        """
+        Search for PubMed articles based on the query string.
+        :param query: Query string to search for.
+        :param N: Maximum number of articles to retrieve.
+        :return: Summaries of the articles.
+        """
+        processed_query = self._process_query(query)
+
+        try:
+            handle = Entrez.esearch(db="pubmed", term=processed_query, retmax=N)
+            record = Entrez.read(handle)
+            handle.close()
+            article_ids = record["IdList"]
+
+            if not article_ids:
+                return "No articles found."
+
+            summaries = []
+            handle = Entrez.esummary(db="pubmed", id=','.join(article_ids))
+            records = Entrez.read(handle)
+            handle.close()
+
+            for article in records["DocumentSummarySet"]["DocumentSummary"]:
+                summary = f"Title: {article['Title']}\n"
+                summary += f"Authors: {', '.join(author['Name'] for author in article['Authors'])}\n"
+                summary += f"Source: {article['Source']}\n"
+                summary += f"Publication Date: {article['PubDate']}\n"
+                summary += f"PMID: {article['Id']}\n"
+                summaries.append(summary)
+
+            return "\n\n".join(summaries)
+
+        except Exception as e:
+            return f"Error occurred: {e}"
+
+    def retrieve_full_paper_text(self, pmid):
+        """
+        Retrieve the full text of a PubMed article by PMID.
+        :param pmid: PubMed ID of the article.
+        :return: Full text of the article.
+        """
+        try:
+            handle = Entrez.efetch(db="pubmed", id=pmid, rettype="full", retmode="text")
+            full_text = handle.read()
+            handle.close()
+            return full_text
+
+        except Exception as e:
+            return f"Error occurred: {e}"
+
+    def paper_exists(self, pmid):
+        """
+        Check if a PubMed article exists by PMID.
+        :param pmid: PubMed ID of the article.
+        :return: True if the article exists, False otherwise.
+        """
+        try:
+            handle = Entrez.esummary(db="pubmed", id=pmid)
+            record = Entrez.read(handle)
+            handle.close()
+            return len(record["DocumentSummarySet"]["DocumentSummary"]) > 0
+
+        except Exception as e:
+            return False
+
+
 """
 import multiprocessing
 import sys
