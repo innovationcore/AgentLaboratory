@@ -460,14 +460,24 @@ class LaboratoryWorkflow:
             feedback = str()
 
             # grab summary of papers from arxiv
-            if "```SUMMARY" in resp:
-                query = extract_prompt(resp, "SUMMARY")
+            if "```SUMMARY_ARX" in resp:
+                query = extract_prompt(resp, "SUMMARY_ARX")
                 papers = arx_eng.find_papers_by_str(query, N=self.arxiv_num_summaries)
                 if papers is None:
                     papers = pubmed_eng.find_papers_by_str(query, N=self.arxiv_num_summaries)
                 else :
                     papers += '\n' + pubmed_eng.find_papers_by_str(query, N=self.arxiv_num_summaries)
-                feedback = f"You requested arXiv and PubMed papers related to the query {query}, here was the response\n{papers}"
+                feedback = f"You requested arXiv papers related to the query {query}, here was the response\n{papers}"
+
+            # grab summary of papers from PubMed
+            if "```SUMMARY_PM" in resp:
+                query = extract_prompt(resp, "SUMMARY_PM")
+                papers = arx_eng.find_papers_by_str(query, N=self.arxiv_num_summaries)
+                if papers is None:
+                    papers = pubmed_eng.find_papers_by_str(query, N=self.arxiv_num_summaries)
+                else:
+                    papers += '\n' + pubmed_eng.find_papers_by_str(query, N=self.arxiv_num_summaries)
+                feedback = f"You requested PubMed papers related to the query {query}, here was the response\n{papers}"
 
             # grab full text from arxiv ID
             elif "```FULL_TEXT_ARX" in resp:

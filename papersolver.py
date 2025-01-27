@@ -111,23 +111,23 @@ class PubMed(Command):
     def execute_command(self, *args) -> str:
         # args[0] -> command
         # args[1] -> query
-        if args[0] == "SUMMARY":
+        if args[0] == "SUMMARY_ARX":
             return self.arxiv_eng.find_papers_by_str(args[1], self.num_papers_per_search)
         elif args[0] == "FULL_TEXT_ARX":
             return self.arxiv_eng.retrieve_full_paper_text(args[1])
         raise Exception("Invalid Arxiv Search")
 
     def matches_command(self, cmd_str) -> bool:
-        if "```SUMMARY" in cmd_str: return True
-        elif "```FULL_TEXT" in cmd_str: return True
+        if "```SUMMARY_ARX" in cmd_str: return True
+        elif "```FULL_TEXT_ARX" in cmd_str: return True
         return False
 
     def parse_command(self, *args) -> tuple:
-        sum_text = extract_prompt(args[0], "SUMMARY").split("\n")
-        full_text = extract_prompt(args[0], "FULL_TEXT").split("\n")
+        sum_text = extract_prompt(args[0], "SUMMARY_ARX").split("\n")
+        full_text = extract_prompt(args[0], "FULL_TEXT_ARX").split("\n")
         if len(sum_text) == 0 and len(full_text) == 0: return False, None
-        if len(sum_text) > 0: return True, ("SUMMARY", sum_text,)
-        if len(full_text) > 0: return True, ("FULL_TEXT", sum_text,)
+        if len(sum_text) > 0: return True, ("SUMMARY_ARX", sum_text,)
+        if len(full_text) > 0: return True, ("FULL_TEXT_ARX", sum_text,)
 
 
 """
